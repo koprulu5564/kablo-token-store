@@ -1,71 +1,81 @@
-name: 🔑 Kablo Token Güncelleme
+name: 🔄 Kablo Token Yönetimi
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */24 * * *'
+    - cron: '0 */6 * * *'  # 6 saatte bir (PHP'deki 6 saatlik süreyle aynı)
 
 jobs:
-  update:
+  update_token:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
+    - name: 🛠️ Repoyu Çek
+      uses: actions/checkout@v4
 
-    - name: 🐍 Python Kur
+    - name: 🐍 Python Kurulumu
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: 📦 Paketleri Kur
-      run: pip install requests
-
-    - name: 🔑 Token Çek (PHP'deki Tüm Detaylarla)
+    - name: 🔄 Token İşlemleri (PHP Mantığıyla)
       run: |
         python -c '
-import requests, re, json
+import requests, re, json, os, time
 
-# PHP'deki headerların aynısı
-headers = {
-    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJMSVZFIiwiaXBiIjoiMCIsImNnZCI6IjA5M2Q3MjBhLTUwMmMtNDFlZC1hODBmLTJiODE2OTg0ZmI5NSIsImNzaCI6IlRSS1NUIiwiZGN0IjoiM0VGNzUiLCJkaSI6ImE2OTliODNmLTgyNmItNGQ5OS05MzYxLWM4YTMxMzIxOGQ0NiIsInNnZCI6Ijg5NzQxZmVjLTFkMzMtNGMwMC1hZmNkLTNmZGFmZTBiNmEyZCIsInNwZ2QiOiIxNTJiZDUzOS02MjIwLTQ0MjctYTkxNS1iZjRiZDA2OGQ3ZTgiLCJpY2giOiIwIiwiaWRtIjoiMCIsImlhIjoiOjpmZmZmOjEwLjAuMC4yMDYiLCJhcHYiOiIxLjAuMCIsImFibiI6IjEwMDAiLCJuYmYiOjE3NDUxNTI4MjUsImV4cCI6MTc0NTE1Mjg4NSwiaWF0IjoxNzQ1MTUyODI1fQ.OSlafRMxef4EjHG5t6TqfAQC7y05IiQjwwgf6yMUS9E",
-    "User-Agent": "Mozilla/5.0",
-    "Accept": "application/json"
+# PHP'deki ayarların aynısı
+TOKEN_FILE = "stream_token.txt"
+API_URL = "https://core-api.kablowebtv.com/api/channels"
+HEADERS = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "Content-Type": "application/json"
 }
 
-try:
-    # API isteği (PHP'deki curl'in aynısı)
-    response = requests.get(
-        "https://core-api.kablowebtv.com/api/channels",
-        headers=headers,
-        timeout=10
-    )
-    response.raise_for_status()
+# 1. Token Yönetimi (PHP'deki gibi)
+token = ""
+token_expiry = 0
 
-    # JSON parse (PHP'deki gibi)
-    data = response.json()
-    
-    # Stream URL kontrolü (PHP'deki isset kontrolü)
-    if "Data" in data and "AllChannels" in data["Data"] and len(data["Data"]["AllChannels"]) > 0:
-        stream_url = data["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
-        token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
+if os.path.exists(TOKEN_FILE):
+    with open(TOKEN_FILE, "r") as f:
+        try:
+            data = json.load(f)
+            token = data.get("token", "")
+            token_expiry = data.get("expiry", 0)
+        except:
+            pass
+
+# 2. Token Yenileme (PHP'deki gibi)
+if not token or time.time() > token_expiry:
+    try:
+        response = requests.get(API_URL, headers=HEADERS, timeout=10)
+        response.raise_for_status()
         
-        # Dosyaya yaz (file_put_contents gibi)
-        with open("token.txt", "w") as f:
-            f.write(token)
-        print("✅ Token başarıyla alındı!")
-    else:
-        raise Exception("API geçersiz yanıt verdi")
-
-except Exception as e:
-    print(f"❌ Hata: {str(e)}")
-    exit(1)
+        data = response.json()
+        if "Data" in data and "AllChannels" in data["Data"] and data["Data"]["AllChannels"]:
+            stream_url = data["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
+            match = re.search(r"wmsAuthSign=([^&]+)", stream_url)
+            if match:
+                token = match.group(1)
+                token_expiry = int(time.time()) + (6 * 3600)  # 6 saatlik süre
+                
+                # PHP'deki file_put_contents eşdeğeri
+                with open(TOKEN_FILE, "w") as f:
+                    json.dump({"token": token, "expiry": token_expiry}, f)
+                print("✅ Token güncellendi!")
+            else:
+                raise Exception("Token bulunamadı")
+        else:
+            raise Exception("Geçersiz API yanıtı")
+    except Exception as e:
+        print(f"❌ Hata: {e}")
+        exit(1)
         '
 
     - name: 💾 Değişiklikleri Kaydet
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        git add token.txt
-        git commit -m "🔄 Token güncellendi: $(date +'%d.%m.%Y %H:%M')"
+        git add stream_token.txt
+        git commit -m "🔄 Token yenilendi: $(date +'%d.%m.%Y %H:%M')"
         git push
