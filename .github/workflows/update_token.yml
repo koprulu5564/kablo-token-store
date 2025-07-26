@@ -1,0 +1,41 @@
+name: Update Token
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */24 * * *' # Her 24 saatte bir
+
+jobs:
+  update_token:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+
+    - name: Get Token and Save
+      run: |
+        php -r '
+        $ch = curl_init("https://core-api.kablowebtv.com/api/channels");
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (token buraya)"
+        ]);
+        $response = curl_exec($ch);
+        $data = json_decode($response, true);
+        
+        if(isset($data["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"])) {
+            preg_match("/wmsAuthSign=([^&]+)/", $data["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"], $matches);
+            file_put_contents("token.txt", $matches[1]);
+        }
+        '
+        
+    - name: Commit and Push
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add token.txt
+        git commit -m "Auto-update token"
+        git push
