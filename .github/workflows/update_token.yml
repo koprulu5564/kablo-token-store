@@ -1,6 +1,6 @@
-name: 🔄 MANUEL Token Güncelleme
-on: 
-  workflow_dispatch: # Kritik: Bu satır manuel çalıştırmayı aktif eder
+name: 🔑 Kablo Token Güncelleme
+on:
+  workflow_dispatch:
   schedule:
     - cron: '0 */24 * * *'
 
@@ -11,31 +11,54 @@ jobs:
       contents: write
 
     steps:
-    - name: 🛠️ Repoyu Çek
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: 🐍 Python Kurulumu
+    - name: 🐍 Python Kur
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: 📦 Gerekli Paketler
+    - name: 📦 Paketleri Kur
       run: pip install requests
 
-    - name: 🔑 Token Çekme (Düzeltilmiş)
+    - name: 🔑 Token Çek (PHP'deki Tüm Detaylarla)
       run: |
         python -c '
-import requests, re
+import requests, re, json
+
+# PHP'deki headerların aynısı
+headers = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJMSVZFIiwiaXBiIjoiMCIsImNnZCI6IjA5M2Q3MjBhLTUwMmMtNDFlZC1hODBmLTJiODE2OTg0ZmI5NSIsImNzaCI6IlRSS1NUIiwiZGN0IjoiM0VGNzUiLCJkaSI6ImE2OTliODNmLTgyNmItNGQ5OS05MzYxLWM4YTMxMzIxOGQ0NiIsInNnZCI6Ijg5NzQxZmVjLTFkMzMtNGMwMC1hZmNkLTNmZGFmZTBiNmEyZCIsInNwZ2QiOiIxNTJiZDUzOS02MjIwLTQ0MjctYTkxNS1iZjRiZDA2OGQ3ZTgiLCJpY2giOiIwIiwiaWRtIjoiMCIsImlhIjoiOjpmZmZmOjEwLjAuMC4yMDYiLCJhcHYiOiIxLjAuMCIsImFibiI6IjEwMDAiLCJuYmYiOjE3NDUxNTI4MjUsImV4cCI6MTc0NTE1Mjg4NSwiaWF0IjoxNzQ1MTUyODI1fQ.OSlafRMxef4EjHG5t6TqfAQC7y05IiQjwwgf6yMUS9E",
+    "User-Agent": "Mozilla/5.0",
+    "Accept": "application/json"
+}
+
 try:
-    headers = {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
-    r = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers, timeout=20)
-    r.raise_for_status()
-    token = re.search(r"wmsAuthSign=([^&]+)", r.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]).group(1)
-    with open("token.txt", "w") as f:
-        f.write(token)
-    print("✅ Başarılı!")
+    # API isteği (PHP'deki curl'in aynısı)
+    response = requests.get(
+        "https://core-api.kablowebtv.com/api/channels",
+        headers=headers,
+        timeout=10
+    )
+    response.raise_for_status()
+
+    # JSON parse (PHP'deki gibi)
+    data = response.json()
+    
+    # Stream URL kontrolü (PHP'deki isset kontrolü)
+    if "Data" in data and "AllChannels" in data["Data"] and len(data["Data"]["AllChannels"]) > 0:
+        stream_url = data["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
+        token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
+        
+        # Dosyaya yaz (file_put_contents gibi)
+        with open("token.txt", "w") as f:
+            f.write(token)
+        print("✅ Token başarıyla alındı!")
+    else:
+        raise Exception("API geçersiz yanıt verdi")
+
 except Exception as e:
-    print(f"❌ Hata: {e}")
+    print(f"❌ Hata: {str(e)}")
     exit(1)
         '
 
