@@ -1,62 +1,46 @@
 import requests
 import json
-import time
-import re
+import gzip
 import os
 
-TOKEN_FILE = 'stream_token.txt'
 API_URL = "https://core-api.kablowebtv.com/api/channels"
-STATIC_BEARER = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # Tüm JWT token buraya eksiksiz gelecek
+TOKEN_FILE = "stream_token.txt"
+
+# PHP'dekiyle birebir aynı JWT
+JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJMSVZFIiwiaXBiIjoiMCIsImNnZCI6IjA5M2Q3MjBhLTUwMmMtNDFlZC1hODBmLTJiODE2OTg0ZmI5NSIsImNzaCI6IlRSS1NUIiwiZGN0IjoiM0VGNzUiLCJkaSI6ImE2OTliODNmLTgyNmItNGQ5OS05MzYxLWM4YTMxMzIxOGQ0NiIsInNnZCI6Ijg5NzQxZmVjLTFkMzMtNGMwMC1hZmNkLTNmZGFmZTBiNmEyZCIsInNwZ2QiOiIxNTJiZDUzOS02MjIwLTQ0MjctYTkxNS1iZjRiZDA2OGQ3ZTgiLCJpY2giOiIwIiwiaWRtIjoiMCIsImlhIjoiOjpmZmZmOjEwLjAuMC4yMDYiLCJhcHYiOiIxLjAuMCIsImFibiI6IjEwMDAiLCJuYmYiOjE3NDUxNTI4MjUsImV4cCI6MTc0NTE1Mjg4NSwiaWF0IjoxNzQ1MTUyODI1fQ.OSlafRMxef4EjHG5t6TqfAQC7y05IiQjwwgf6yMUS9E"
 
 HEADERS = {
-    "Authorization": f"Bearer {STATIC_BEARER}",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Accept": "application/json, text/plain, */*",
-    "Referer": "https://www.kablowebtv.com/",
-    "Origin": "https://www.kablowebtv.com",
-    "Connection": "keep-alive"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+    "Referer": "https://tvheryerde.com",
+    "Origin": "https://tvheryerde.com",
+    "Authorization": f"Bearer {JWT_TOKEN}",
+    "Accept-Encoding": "gzip"
 }
 
-def load_token():
-    if os.path.exists(TOKEN_FILE):
-        with open(TOKEN_FILE, 'r') as f:
-            try:
-                data = json.load(f)
-                if 'token' in data and 'expiry' in data and time.time() < data['expiry']:
-                    return data['token']
-            except json.JSONDecodeError:
-                pass
-    return None
 
-def save_token(token, expiry):
-    with open(TOKEN_FILE, 'w') as f:
-        json.dump({'token': token, 'expiry': expiry}, f)
-
-def fetch_new_token():
+def fetch_and_save_token():
     response = requests.get(API_URL, headers=HEADERS)
+
     if response.status_code != 200:
         raise Exception(f"API error: {response.status_code}")
-    data = response.json()
-    
-    try:
-        sample_url = data['Data']['AllChannels'][0]['StreamData']['HlsStreamUrl']
-        match = re.search(r'wmsAuthSign=([^&]+)', sample_url)
-        if match:
-            token = match.group(1)
-            expiry = time.time() + 6 * 60 * 60  # 6 saat
-            save_token(token, expiry)
-            print("Yeni token kaydedildi.")
-        else:
-            raise ValueError("wmsAuthSign bulunamadı.")
-    except Exception as e:
-        print("Token çekme hatası:", str(e))
 
-def main():
-    token = load_token()
-    if token is None:
-        fetch_new_token()
+    # Gzip çözümlemesi varsa yap
+    if response.headers.get("Content-Encoding") == "gzip":
+        content = gzip.decompress(response.content).decode("utf-8")
     else:
-        print("Token geçerli, yenileme gerekmedi.")
+        content = response.text
 
-if __name__ == '__main__':
-    main()
+    data = json.loads(content)
+
+    if not data or not data.get("IsSucceeded") or "Data" not in data:
+        raise Exception("API geçersiz yanıt verdi")
+
+    # Token’ı dosyaya yazıyoruz (bu örnekte JWT sabit ama bu kısmı dinamik hale de getirebiliriz)
+    with open(TOKEN_FILE, "w") as f:
+        f.write(JWT_TOKEN)
+
+    print("Token başarıyla güncellendi.")
+
+
+if __name__ == "__main__":
+    fetch_and_save_token()
