@@ -1,6 +1,6 @@
 name: Update Token
 on:
-  workflow_dispatch:  # Manuel tetikleme
+  workflow_dispatch:
   schedule:
     - cron: '0 */24 * * *'  # 24 saatte bir
 
@@ -22,27 +22,28 @@ jobs:
     - name: Install dependencies
       run: pip install requests
 
-    - name: Fetch and save token
+    - name: Fetch and save token (PHP'nin Python çevirisi)
       run: |
         python -c '
 import requests
 import re
+import json
 
-# API'den token çek
+# API'den veri çek (PHP'deki curl kısmı)
 headers = {
     "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 response = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers)
 response.raise_for_status()
 
-# Token'ı parse et
+# Token'ı parse et (PHP'deki preg_match kısmı)
 stream_url = response.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
 token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
 
-# Dosyaya yaz
+# Dosyaya yaz (PHP'deki file_put_contents kısmı)
 with open("token.txt", "w") as f:
     f.write(token)
-print("Token güncellendi!")
+print("Token başarıyla güncellendi!")
         '
 
     - name: Commit and push
@@ -50,5 +51,5 @@ print("Token güncellendi!")
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add token.txt
-        git commit -m "🔑 Token updated: $(date +'%Y-%m-%d %H:%M')"
+        git commit -m "🔑 Otomatik Token Güncelleme: $(date +'%d.%m.%Y %H:%M')"
         git push
