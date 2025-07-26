@@ -1,0 +1,32 @@
+name: kablo_api_token
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Her gün saat 00:00'da çalışır
+  workflow_dispatch:     # Manuel çalıştırma için
+
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo'yu klonla
+        uses: actions/checkout@v3
+
+      - name: Python kurulumu
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Gereksinimleri yükle (gerekirse)
+        run: pip install requests
+
+      - name: Token scriptini çalıştır
+        run: python get_token.py
+
+      - name: Değişiklik varsa commit et
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add stream_token.txt
+          git commit -m "Token güncellendi" || echo "Değişiklik yok"
+          git push
