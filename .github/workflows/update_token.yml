@@ -1,11 +1,11 @@
-name: 🔄 Kablo Token Yönetimi
-on:
-  workflow_dispatch:
+name: 🎬 KABLO TV - Token Güncelleme
+on: 
+  workflow_dispatch: # Manuel çalıştırma için ZORUNLU
   schedule:
-    - cron: '0 */6 * * *'  # 6 saatte bir (PHP'deki 6 saatlik süreyle aynı)
+    - cron: '0 */6 * * *' # 6 saatte bir
 
 jobs:
-  update_token:
+  update:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -13,66 +13,48 @@ jobs:
     steps:
     - name: 🛠️ Repoyu Çek
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Tüm geçmişi çek
 
-    - name: 🐍 Python Kurulumu
+    - name: 🐍 Python Kur
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: 🔄 Token İşlemleri (PHP Mantığıyla)
+    - name: 🔑 Token İşlemi (PHP Mantığı)
       run: |
-        python -c '
-import requests, re, json, os, time
-
-# PHP'deki ayarların aynısı
-TOKEN_FILE = "stream_token.txt"
-API_URL = "https://core-api.kablowebtv.com/api/channels"
-HEADERS = {
-    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "Content-Type": "application/json"
-}
-
-# 1. Token Yönetimi (PHP'deki gibi)
-token = ""
-token_expiry = 0
-
-if os.path.exists(TOKEN_FILE):
-    with open(TOKEN_FILE, "r") as f:
-        try:
-            data = json.load(f)
-            token = data.get("token", "")
-            token_expiry = data.get("expiry", 0)
-        except:
-            pass
-
-# 2. Token Yenileme (PHP'deki gibi)
-if not token or time.time() > token_expiry:
-    try:
-        response = requests.get(API_URL, headers=HEADERS, timeout=10)
-        response.raise_for_status()
+        if [ ! -f "stream_token.txt" ]; then
+          echo '{"token":"INITIAL_TOKEN","expiry":0}' > stream_token.txt
+        fi
         
-        data = response.json()
-        if "Data" in data and "AllChannels" in data["Data"] and data["Data"]["AllChannels"]:
-            stream_url = data["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
-            match = re.search(r"wmsAuthSign=([^&]+)", stream_url)
-            if match:
-                token = match.group(1)
-                token_expiry = int(time.time()) + (6 * 3600)  # 6 saatlik süre
-                
-                # PHP'deki file_put_contents eşdeğeri
-                with open(TOKEN_FILE, "w") as f:
-                    json.dump({"token": token, "expiry": token_expiry}, f)
-                print("✅ Token güncellendi!")
-            else:
-                raise Exception("Token bulunamadı")
-        else:
-            raise Exception("Geçersiz API yanıtı")
-    except Exception as e:
-        print(f"❌ Hata: {e}")
-        exit(1)
+        python -c '
+import requests, re, json, time
+try:
+    with open("stream_token.txt","r") as f:
+        data = json.load(f)
+        if time.time() < data["expiry"]:
+            print("⏳ Zamanı dolmamış token var")
+            exit(0)
+
+    headers = {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "User-Agent": "Mozilla/5.0"
+    }
+    r = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers, timeout=10)
+    r.raise_for_status()
+    
+    stream_url = r.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
+    token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
+    
+    with open("stream_token.txt","w") as f:
+        json.dump({"token":token,"expiry":time.time()+21600},f) # 6 saat
+    print("✅ Token güncellendi: "+token)
+except Exception as e:
+    print(f"❌ Hata: {e}")
+    exit(1)
         '
 
-    - name: 💾 Değişiklikleri Kaydet
+    - name: 💾 GitHub'a Gönder
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
