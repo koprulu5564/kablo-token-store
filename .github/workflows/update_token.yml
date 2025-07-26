@@ -1,58 +1,48 @@
-name: 🔄 Update Kablo Token
-on:
-  workflow_dispatch: # Manuel çalıştırma için
+name: 🔄 MANUEL Token Güncelleme
+on: 
+  workflow_dispatch: # Kritik: Bu satır manuel çalıştırmayı aktif eder
   schedule:
-    - cron: '0 */24 * * *' # 24 saatte bir
+    - cron: '0 */24 * * *'
 
 jobs:
-  update_token:
+  update:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Repo'ya yazma izni
+      contents: write
 
     steps:
-    - name: 🛠️ Checkout repo
+    - name: 🛠️ Repoyu Çek
       uses: actions/checkout@v4
 
-    - name: 🐍 Setup Python
+    - name: 🐍 Python Kurulumu
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: 📦 Install dependencies
+    - name: 📦 Gerekli Paketler
       run: pip install requests
 
-    - name: 🔑 Fetch Token (Hata Düzeltmeli)
+    - name: 🔑 Token Çekme (Düzeltilmiş)
       run: |
         python -c '
-import requests, re, os
+import requests, re
 try:
-    # API isteği
-    headers = {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJMSVZFIiwiaXBiIjoiMCIsImNnZCI6IjA5M2Q3MjBhLTUwMmMtNDFlZC1hODBmLTJiODE2OTg0ZmI5NSIsImNzaCI6IlRSS1NUIiwiZGN0IjoiM0VGNzUiLCJkaSI6ImE2OTliODNmLTgyNmItNGQ5OS05MzYxLWM4YTMxMzIxOGQ0NiIsInNnZCI6Ijg5NzQxZmVjLTFkMzMtNGMwMC1hZmNkLTNmZGFmZTBiNmEyZCIsInNwZ2QiOiIxNTJiZDUzOS02MjIwLTQ0MjctYTkxNS1iZjRiZDA2OGQ3ZTgiLCJpY2giOiIwIiwiaWRtIjoiMCIsImlhIjoiOjpmZmZmOjEwLjAuMC4yMDYiLCJhcHYiOiIxLjAuMCIsImFibiI6IjEwMDAiLCJuYmYiOjE3NDUxNTI4MjUsImV4cCI6MTc0NTE1Mjg4NSwiaWF0IjoxNzQ1MTUyODI1fQ.OSlafRMxef4EjHG5t6TqfAQC7y05IiQjwwgf6yMUS9E"}
-    response = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers, timeout=10)
-    response.raise_for_status()
-    
-    # Token çekme
-    stream_url = response.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
-    token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
-    
-    # Dosyaya yaz
+    headers = {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+    r = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers, timeout=20)
+    r.raise_for_status()
+    token = re.search(r"wmsAuthSign=([^&]+)", r.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]).group(1)
     with open("token.txt", "w") as f:
         f.write(token)
-    print("✅ Token başarıyla alındı!")
+    print("✅ Başarılı!")
 except Exception as e:
-    print(f"❌ HATA: {str(e)}")
-    if not os.path.exists("token.txt"):
-        with open("token.txt", "w") as f:
-            f.write("DEFAULT_TOKEN") # Fallback
-        print("⚠️ Geçici token oluşturuldu")
+    print(f"❌ Hata: {e}")
     exit(1)
         '
 
-    - name: 💾 Commit & Push
+    - name: 💾 Değişiklikleri Kaydet
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add token.txt
-        git commit -m "🔄 Token updated: $(date +'%d.%m.%Y %H:%M')"
+        git commit -m "🔄 Token güncellendi: $(date +'%d.%m.%Y %H:%M')"
         git push
