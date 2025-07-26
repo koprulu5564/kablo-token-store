@@ -1,30 +1,29 @@
-name: Update Token
+name: 🚀 Update Kablo Token
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manuel çalıştırma için ZORUNLU
   schedule:
     - cron: '0 */24 * * *'
 
 jobs:
-  update_token:
+  update:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write  # Repo'ya yazma izni
 
     steps:
-    - name: Checkout repo
+    - name: 🔍 Checkout repo
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Tüm Git geçmişini çek
 
-    - name: Setup Python
+    - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: 📦 Install dependencies
       run: pip install requests
 
-    - name: Fetch token and create/update file
+    - name: 🔑 Fetch Token
+      id: fetch_token
       run: |
         python -c '
 import requests, re, os
@@ -38,20 +37,20 @@ try:
     
     with open("token.txt", "w") as f:
         f.write(token)
-    print("SUCCESS: Token saved!")
+    print("::set-output name=status::success")
 except Exception as e:
-    print(f"ERROR: {str(e)}")
+    print(f"::error::{e}")
+    print("::set-output name=status::failed")
     if not os.path.exists("token.txt"):
         with open("token.txt", "w") as f:
-            f.write("TEMPORARY_TOKEN")  # Fallback
-        print("Created token.txt with placeholder")
-    exit(1)
+            f.write("TEMPORARY_TOKEN")
         '
 
-    - name: Commit and push
+    - name: 💾 Commit changes
+      if: steps.fetch_token.outputs.status == 'success'
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add token.txt
-        git commit -m "🔧 Auto-update token: $(date +'%Y-%m-%d %H:%M')"
+        git commit -m "🔄 Token updated: $(date +'%d.%m.%Y %H:%M')"
         git push
