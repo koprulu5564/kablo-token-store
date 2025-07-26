@@ -6,9 +6,15 @@ import os
 
 TOKEN_FILE = 'stream_token.txt'
 API_URL = "https://core-api.kablowebtv.com/api/channels"
-STATIC_BEARER = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # (kısaltıldı)
+STATIC_BEARER = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # Tüm JWT token buraya eksiksiz gelecek
+
 HEADERS = {
-    "Authorization": f"Bearer {STATIC_BEARER}"
+    "Authorization": f"Bearer {STATIC_BEARER}",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.kablowebtv.com/",
+    "Origin": "https://www.kablowebtv.com",
+    "Connection": "keep-alive"
 }
 
 def load_token():
