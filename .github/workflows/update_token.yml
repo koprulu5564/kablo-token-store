@@ -1,14 +1,14 @@
-name: 🔑 Update Kablo Token
+name: 🔄 Update Kablo Token
 on:
-  workflow_dispatch:  # Manuel çalıştırma için
+  workflow_dispatch: # Manuel çalıştırma için
   schedule:
-    - cron: '0 */24 * * *'  # 24 saatte bir
+    - cron: '0 */24 * * *' # 24 saatte bir
 
 jobs:
   update_token:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Repo'ya yazma izni
 
     steps:
     - name: 🛠️ Checkout repo
@@ -22,27 +22,37 @@ jobs:
     - name: 📦 Install dependencies
       run: pip install requests
 
-    - name: 🔄 Fetch Token
+    - name: 🔑 Fetch Token (Hata Düzeltmeli)
       run: |
         python -c '
-        import requests, re
-        try:
-            headers = {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
-            response = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers)
-            response.raise_for_status()
-            token = re.search(r"wmsAuthSign=([^&]+)", response.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]).group(1)
-            with open("token.txt", "w") as f:
-                f.write(token)
-            print("✅ Token saved!")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            exit(1)
+import requests, re, os
+try:
+    # API isteği
+    headers = {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJMSVZFIiwiaXBiIjoiMCIsImNnZCI6IjA5M2Q3MjBhLTUwMmMtNDFlZC1hODBmLTJiODE2OTg0ZmI5NSIsImNzaCI6IlRSS1NUIiwiZGN0IjoiM0VGNzUiLCJkaSI6ImE2OTliODNmLTgyNmItNGQ5OS05MzYxLWM4YTMxMzIxOGQ0NiIsInNnZCI6Ijg5NzQxZmVjLTFkMzMtNGMwMC1hZmNkLTNmZGFmZTBiNmEyZCIsInNwZ2QiOiIxNTJiZDUzOS02MjIwLTQ0MjctYTkxNS1iZjRiZDA2OGQ3ZTgiLCJpY2giOiIwIiwiaWRtIjoiMCIsImlhIjoiOjpmZmZmOjEwLjAuMC4yMDYiLCJhcHYiOiIxLjAuMCIsImFibiI6IjEwMDAiLCJuYmYiOjE3NDUxNTI4MjUsImV4cCI6MTc0NTE1Mjg4NSwiaWF0IjoxNzQ1MTUyODI1fQ.OSlafRMxef4EjHG5t6TqfAQC7y05IiQjwwgf6yMUS9E"}
+    response = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers, timeout=10)
+    response.raise_for_status()
+    
+    # Token çekme
+    stream_url = response.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
+    token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
+    
+    # Dosyaya yaz
+    with open("token.txt", "w") as f:
+        f.write(token)
+    print("✅ Token başarıyla alındı!")
+except Exception as e:
+    print(f"❌ HATA: {str(e)}")
+    if not os.path.exists("token.txt"):
+        with open("token.txt", "w") as f:
+            f.write("DEFAULT_TOKEN") # Fallback
+        print("⚠️ Geçici token oluşturuldu")
+    exit(1)
         '
 
-    - name: 💾 Commit changes
+    - name: 💾 Commit & Push
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add token.txt
-        git commit -m "🔄 Auto-update token: $(date +'%d.%m.%Y %H:%M')"
+        git commit -m "🔄 Token updated: $(date +'%d.%m.%Y %H:%M')"
         git push
