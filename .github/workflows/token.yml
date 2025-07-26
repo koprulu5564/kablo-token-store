@@ -3,7 +3,7 @@ name: Fetch Token
 on:
   schedule:
     - cron: '0 */24 * * *'  # Her 24 saatte bir
-  workflow_dispatch:        # Manuel çalıştırma desteği
+  workflow_dispatch:
 
 jobs:
   fetch-token:
@@ -13,15 +13,15 @@ jobs:
       - name: Repo'yu klonla
         uses: actions/checkout@v3
 
-      - name: Python kur
+      - name: Python kurulumu
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: requests modülünü yükle
+      - name: Gerekli kütüphaneleri yükle
         run: pip install requests
 
-      - name: Token al ve dosyaya yaz
+      - name: Token dosyasını oluştur
         run: python get_token.py
 
       - name: Git yapılandırması
@@ -29,10 +29,14 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-      - name: Dosyayı commitle ve push et
+      - name: Değişiklik varsa commitle ve push et
         run: |
-          git add stream_token.txt
-          git commit -m "Otomatik token güncelleme [skip ci]" || echo "Değişiklik yok"
-          git push
+          if [ -f "stream_token.txt" ]; then
+            git add stream_token.txt
+            git commit -m "Otomatik token güncellemesi [skip ci]" || echo "Değişiklik yok"
+            git push
+          else
+            echo "stream_token.txt bulunamadı, commit yapılmadı."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
