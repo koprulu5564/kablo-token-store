@@ -1,31 +1,18 @@
-name: Günlük Token Alıcı
-
 on:
   schedule:
-    - cron: '0 3 * * *' # Her gün sabah 06:00 (UTC+3)
-  workflow_dispatch:
+    - cron: '0 2 * * *'
 
 jobs:
-  token-job:
+  fetch-token:
     runs-on: ubuntu-latest
     steps:
-      - name: Repo klonla
-        uses: actions/checkout@v3
-
-      - name: Python kur
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Gereksiz modüller yok çünkü `requests` sistemde var
-
-      - name: Token al ve yaz
-        run: python get_token.py
-
-      - name: Değişiklikleri commit et
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with: python-version: '3.x'
+      - run: python get_token.py
+      - run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "..."
           git add token.txt
-          git commit -m "🆕 Yeni token alındı - $(date)" || echo "Değişiklik yok"
+          git commit -m "Token yenilendi"
           git push
