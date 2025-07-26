@@ -1,33 +1,27 @@
 import requests
-from urllib.parse import urlparse, parse_qs
 
-API_URL = "https://core-api.kablowebtv.com/api/channels"
-TOKEN_FILE = "token.txt"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+# API isteği için gerekli headers
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
     "Referer": "https://tvheryerde.com",
     "Origin": "https://tvheryerde.com",
     "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJMSVZFIiwiaXBiIjoiMCIsImNnZCI6IjA5M2Q3MjBhLTUwMmMtNDFlZC1hODBmLTJiODE2OTg0ZmI5NSIsImNzaCI6IlRSS1NUIiwiZGN0IjoiM0VGNzUiLCJkaSI6ImE2OTliODNmLTgyNmItNGQ5OS05MzYxLWM4YTMxMzIxOGQ0NiIsInNnZCI6Ijg5NzQxZmVjLTFkMzMtNGMwMC1hZmNkLTNmZGFmZTBiNmEyZCIsInNwZ2QiOiIxNTJiZDUzOS02MjIwLTQ0MjctYTkxNS1iZjRiZDA2OGQ3ZTgiLCJpY2giOiIwIiwiaWRtIjoiMCIsImlhIjoiOjpmZmZmOjEwLjAuMC4yMDYiLCJhcHYiOiIxLjAuMCIsImFibiI6IjEwMDAiLCJuYmYiOjE3NDUxNTI4MjUsImV4cCI6MTc0NTE1Mjg4NSwiaWF0IjoxNzQ1MTUyODI1fQ.OSlafRMxef4EjHG5t6TqfAQC7y05IiQjwwgf6yMUS9E"
 }
 
+url = "https://core-api.kablowebtv.com/api/channels"
+
 def fetch_token():
-    resp = requests.get(API_URL, headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    channels = data.get("Data", {}).get("AllChannels", [])
-    if not channels:
-        raise Exception("Kanal listesi boş.")
-
-    hls_url = channels[0]["StreamData"]["HlsStreamUrl"]
-    query = parse_qs(urlparse(hls_url).query)
-    token = query.get("wmsAuthSign", [None])[0]
-    if not token:
-        raise Exception("wmsAuthSign parametresi bulunamadı.")
-
-    with open(TOKEN_FILE, "w") as f:
-        f.write(token)
-
-    print("✅ Token başarıyla güncellendi:", token)
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        try:
+            token = response.json().get("data")[0]["streamUrl"].split("wmsAuthSign=")[-1]
+            with open("stream_token.txt", "w") as f:
+                f.write(token)
+            print("Token kaydedildi.")
+        except Exception as e:
+            print("Token ayrıştırılamadı:", e)
+    else:
+        raise Exception(f"API hatası: {response.status_code}")
 
 if __name__ == "__main__":
     fetch_token()
