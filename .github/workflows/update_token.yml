@@ -2,19 +2,21 @@ name: Update Token
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */24 * * *'  # 24 saatte bir
+    - cron: '0 */24 * * *'
 
 jobs:
   update_token:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Repo'ya yazma izni
+      contents: write
 
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Tüm Git geçmişini çek
 
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
@@ -22,28 +24,28 @@ jobs:
     - name: Install dependencies
       run: pip install requests
 
-    - name: Fetch and save token (PHP'nin Python çevirisi)
+    - name: Fetch token and create/update file
       run: |
         python -c '
-import requests
-import re
-import json
-
-# API'den veri çek (PHP'deki curl kısmı)
-headers = {
-    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-response = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers)
-response.raise_for_status()
-
-# Token'ı parse et (PHP'deki preg_match kısmı)
-stream_url = response.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
-token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
-
-# Dosyaya yaz (PHP'deki file_put_contents kısmı)
-with open("token.txt", "w") as f:
-    f.write(token)
-print("Token başarıyla güncellendi!")
+import requests, re, os
+try:
+    headers = {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+    response = requests.get("https://core-api.kablowebtv.com/api/channels", headers=headers)
+    response.raise_for_status()
+    
+    stream_url = response.json()["Data"]["AllChannels"][0]["StreamData"]["HlsStreamUrl"]
+    token = re.search(r"wmsAuthSign=([^&]+)", stream_url).group(1)
+    
+    with open("token.txt", "w") as f:
+        f.write(token)
+    print("SUCCESS: Token saved!")
+except Exception as e:
+    print(f"ERROR: {str(e)}")
+    if not os.path.exists("token.txt"):
+        with open("token.txt", "w") as f:
+            f.write("TEMPORARY_TOKEN")  # Fallback
+        print("Created token.txt with placeholder")
+    exit(1)
         '
 
     - name: Commit and push
@@ -51,5 +53,5 @@ print("Token başarıyla güncellendi!")
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add token.txt
-        git commit -m "🔑 Otomatik Token Güncelleme: $(date +'%d.%m.%Y %H:%M')"
+        git commit -m "🔧 Auto-update token: $(date +'%Y-%m-%d %H:%M')"
         git push
